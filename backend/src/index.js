@@ -83,6 +83,11 @@ app.use((err, _req, res, _next) => {
   if (err.code === "P1001") {
     return res.status(503).json({ error: "Database server is unreachable. Check host/port and that Postgres is running." });
   }
+  if (err.code === "P2021") {
+    return res.status(503).json({
+      error: "Database schema is not initialized. Run Prisma db push or migrations on the deployment database.",
+    });
+  }
   if (
     err?.name === "PrismaClientInitializationError" &&
     message.includes("Authentication failed against database server")
