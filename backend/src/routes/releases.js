@@ -2,6 +2,7 @@ const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, requireRole, optionalAuth } = require("../middleware/auth");
 const { imageUpload } = require("../utils/upload");
+const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
 
@@ -68,7 +69,7 @@ router.get("/:id", optionalAuth, async (req, res) => {
     return res.status(403).json({ error: "Release is private" });
   }
 
-  res.json({ release });
+  res.json({ release: { ...release, tracks: filterPlayableTracks(release.tracks) } });
 });
 
 router.post("/:id/sections", requireAuth, requireRole("ARTIST"), async (req, res) => {

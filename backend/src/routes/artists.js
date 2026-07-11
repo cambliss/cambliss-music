@@ -2,6 +2,7 @@ const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, optionalAuth } = require("../middleware/auth");
 const { imageUpload } = require("../utils/upload");
+const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
 
@@ -59,7 +60,15 @@ router.get("/:id", optionalAuth, async (req, res) => {
   }
 
   const { passwordHash, ...publicArtist } = artist;
-  res.json({ artist: publicArtist, isFollowing });
+  const sanitizedArtist = {
+    ...publicArtist,
+    tracks: filterPlayableTracks(publicArtist.tracks),
+    albums: publicArtist.albums.map((album) => ({
+      ...album,
+      tracks: filterPlayableTracks(album.tracks),
+    })),
+  };
+  res.json({ artist: sanitizedArtist, isFollowing });
 });
 
 // Update own artist profile

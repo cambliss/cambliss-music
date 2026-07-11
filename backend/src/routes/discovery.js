@@ -1,6 +1,7 @@
 const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth } = require("../middleware/auth");
+const { filterPlayableTracks, isTrackPlayable } = require("../utils/media");
 
 const router = express.Router();
 
@@ -40,10 +41,10 @@ router.get("/feed", requireAuth, async (req, res) => {
 
   res.json({
     feed: {
-      recentTracks,
-      likes: likes.map((x) => x.track),
-      reposts: reposts.map((x) => x.track),
-      history,
+      recentTracks: filterPlayableTracks(recentTracks),
+      likes: filterPlayableTracks(likes.map((x) => x.track)),
+      reposts: filterPlayableTracks(reposts.map((x) => x.track)),
+      history: history.filter((x) => isTrackPlayable(x.track)),
     },
   });
 });

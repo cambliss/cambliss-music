@@ -4,6 +4,7 @@ const path = require("path");
 const prisma = require("../prisma");
 const { requireAuth, requireRole, optionalAuth } = require("../middleware/auth");
 const { audioUpload, UPLOAD_ROOT } = require("../utils/upload");
+const { filterPlayableTracks, isTrackPlayable } = require("../utils/media");
 
 const router = express.Router();
 
@@ -44,7 +45,8 @@ router.get("/", async (req, res) => {
     prisma.track.count({ where }),
   ]);
 
-  res.json({ tracks, total, page: Number(page), pageSize: take });
+  const playableTracks = filterPlayableTracks(tracks);
+  res.json({ tracks: playableTracks, total: playableTracks.length, page: Number(page), pageSize: take });
 });
 
 // Upload a new track (artist only)
@@ -133,6 +135,7 @@ router.get("/:id", async (req, res) => {
     },
   });
   if (!track) return res.status(404).json({ error: "Track not found" });
+  if (!isTrackPlayable(track)) return res.status(404).json({ error: "Audio file missing on server" });
   res.json({ track });
 });
 

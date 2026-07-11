@@ -2,6 +2,7 @@ const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { imageUpload } = require("../utils/upload");
+const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get("/:id", async (req, res) => {
     },
   });
   if (!album) return res.status(404).json({ error: "Album not found" });
-  res.json({ album });
+  res.json({ album: { ...album, tracks: filterPlayableTracks(album.tracks) } });
 });
 
 router.post("/", requireAuth, requireRole("ARTIST"), imageUpload.single("cover"), async (req, res) => {

@@ -1,5 +1,6 @@
 const express = require("express");
 const prisma = require("../prisma");
+const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.get("/", async (req, res) => {
     }),
   ]);
 
-  res.json({ artists, tracks, albums, releases, playlists });
+  res.json({ artists, tracks: filterPlayableTracks(tracks), albums, releases, playlists });
 });
 
 module.exports = router;
