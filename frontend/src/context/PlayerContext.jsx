@@ -4,8 +4,7 @@ import { fileUrl } from "../api/client";
 const PlayerContext = createContext(null);
 
 function mediaKindFor(track) {
-  const source = String(track?.fileUrl || "").toLowerCase();
-  return source.endsWith(".mp4") ? "video" : "audio";
+  return track?.mediaType === "video" ? "video" : "audio";
 }
 
 export function PlayerProvider({ children }) {
