@@ -33,7 +33,11 @@ export default function Browse() {
         const payload =
           res.data[tab] ||
           (tab === "releases" ? res.data.releases : tab === "playlists" ? res.data.playlists : []);
-        setData((prev) => ({ ...prev, [tab]: payload }));
+        const nextPayload =
+          tab === "releases"
+            ? [...payload].sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))
+            : payload;
+        setData((prev) => ({ ...prev, [tab]: nextPayload }));
       })
       .finally(() => setLoading(false));
   }, [tab]);
@@ -85,6 +89,9 @@ export default function Browse() {
               <div key={r.id} className="rounded-xl border border-hairline bg-surface p-4">
                 <p className="font-display text-lg text-paper">{r.title}</p>
                 <p className="text-xs text-muted">{r.artist?.name} · {r.type}</p>
+                <p className="mt-2 font-mono text-xs text-muted">
+                  {new Date(r.releaseDate).toLocaleDateString()}
+                </p>
               </div>
             ))
           )}

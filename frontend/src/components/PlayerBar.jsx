@@ -13,7 +13,16 @@ export default function PlayerBar() {
 
   return (
     <>
-      <audio ref={attachAudioElement} preload="metadata" className="hidden" />
+      <audio
+        ref={attachAudioElement}
+        preload="metadata"
+        controls
+        className={
+          current && mediaKind === "audio"
+            ? "fixed inset-x-0 bottom-18 z-40 mx-auto h-12 w-full max-w-6xl rounded-xl border border-hairline bg-surface px-2"
+            : "hidden"
+        }
+      />
       <video
         ref={attachVideoElement}
         playsInline
@@ -27,6 +36,7 @@ export default function PlayerBar() {
       {current ? (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-surface">
           {mediaKind === "video" ? <div className="h-46 border-b border-hairline bg-ink/60 sm:h-62" /> : null}
+          {mediaKind === "audio" ? <div className="h-14 border-b border-hairline bg-ink/30" /> : null}
           <input
             type="range"
             min={0}

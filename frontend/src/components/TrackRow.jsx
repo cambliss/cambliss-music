@@ -1,4 +1,7 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import client from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import Waveform from "./Waveform";
 
@@ -11,12 +14,49 @@ function formatDuration(ms) {
 }
 
 export default function TrackRow({ track, index }) {
+  const { user } = useAuth();
   const { play, current, isPlaying, toggle } = usePlayer();
+  const [saving, setSaving] = useState(false);
   const isCurrent = current?.id === track.id;
 
   function handlePlayClick() {
     if (isCurrent) toggle();
     else play(track);
+  }
+
+  async function handleSaveToPlaylist(e) {
+    e.stopPropagation();
+    if (!user || saving) return;
+
+    const playlistName = window.prompt("Playlist name", `${track.title} favorites`);
+    if (!playlistName?.trim()) return;
+
+    setSaving(true);
+    try {
+      const { data } = await client.get("/playlists", { params: { pageSize: 100 } });
+      const existing = (data.playlists || []).find(
+        (playlist) =>
+          playlist.ownerId === user.id &&
+          playlist.title.trim().toLowerCase() === playlistName.trim().toLowerCase()
+      );
+
+      const playlist = existing
+        ? existing
+        : (
+            await client.post("/playlists", {
+              title: playlistName.trim(),
+              description: "",
+              isPublic: false,
+            })
+          ).data.playlist;
+
+      await client.post(`/playlists/${playlist.id}/tracks`, { trackId: track.id });
+      window.alert(`Saved to playlist: ${playlist.title}`);
+    } catch (error) {
+      window.alert(error.response?.data?.error || "Could not save track to playlist.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -59,6 +99,16 @@ export default function TrackRow({ track, index }) {
         <span className="hidden rounded-full border border-hairline px-2 py-0.5 font-mono text-[10px] text-muted sm:block">
           {track.genre}
         </span>
+      )}
+
+      {user && (
+        <button
+          type="button"
+          onClick={handleSaveToPlaylist}
+          className="rounded-full border border-hairline px-2 py-1 text-[10px] text-muted hover:border-amber hover:text-amber"
+        >
+          {saving ? "Saving..." : "Add to playlist"}
+        </button>
       )}
 
       <span className="font-mono text-xs text-muted">{formatDuration(track.durationMs)}</span>
