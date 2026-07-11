@@ -23,7 +23,22 @@ app.use(express.json());
 // Static file serving for uploaded audio/images
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
+app.get("/", (_req, res) => {
+  res.json({
+    service: "Cambliss API",
+    status: "ok",
+    health: "/api/health",
+  });
+});
+
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+
+app.get("/api", (_req, res) => {
+  res.json({
+    service: "Cambliss API",
+    status: "ok",
+  });
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/artists", artistRoutes);
