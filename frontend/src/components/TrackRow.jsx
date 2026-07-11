@@ -21,9 +21,18 @@ export default function TrackRow({ track, index }) {
 
   return (
     <div
+      onClick={handlePlayClick}
       className={`group flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-surface-2 ${
         isCurrent ? "bg-surface-2" : ""
       }`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handlePlayClick();
+        }
+      }}
     >
       <button
         onClick={handlePlayClick}
@@ -38,6 +47,7 @@ export default function TrackRow({ track, index }) {
         {track.artist && (
           <Link
             to={`/artists/${track.artist.id}`}
+            onClick={(e) => e.stopPropagation()}
             className="truncate text-xs text-muted hover:text-amber"
           >
             {track.artist.name}
