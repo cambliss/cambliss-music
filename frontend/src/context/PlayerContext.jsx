@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useRef, useState, useCallback } from "react";
 import { fileUrl } from "../api/client";
 
 const PlayerContext = createContext(null);
@@ -9,7 +9,8 @@ function mediaKindFor(track) {
 }
 
 export function PlayerProvider({ children }) {
-  const mediaRef = useRef(null);
+  const audioElementRef = useRef(null);
+  const videoElementRef = useRef(null);
   const [current, setCurrent] = useState(null); // track object
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -17,66 +18,63 @@ export function PlayerProvider({ children }) {
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaKind, setMediaKind] = useState("audio");
 
-  const syncMediaElement = useCallback((element, autoplay) => {
-    if (!element || !mediaUrl) return;
-
-    if (element.src !== mediaUrl) {
-      element.src = mediaUrl;
-      element.load();
-    }
-
+  const bindMediaEvents = useCallback((element) => {
+    if (!element) return;
     element.ontimeupdate = () => setProgress(element.currentTime);
     element.onloadedmetadata = () => setDuration(element.duration);
     element.onended = () => setIsPlaying(false);
+  }, []);
 
-    if (autoplay) {
-      element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    }
-  }, [mediaUrl]);
+  const attachAudioElement = useCallback((element) => {
+    audioElementRef.current = element;
+    bindMediaEvents(element);
+  }, [bindMediaEvents]);
 
-  const attachMediaElement = useCallback((element) => {
-    if (mediaRef.current === element) return;
+  const attachVideoElement = useCallback((element) => {
+    videoElementRef.current = element;
+    bindMediaEvents(element);
+  }, [bindMediaEvents]);
 
-    if (mediaRef.current && mediaRef.current !== element) {
-      mediaRef.current.pause();
-    }
-
-    mediaRef.current = element;
-
-    if (element && mediaUrl) {
-      syncMediaElement(element, isPlaying);
-    }
-  }, [isPlaying, mediaUrl, syncMediaElement]);
-
-  useEffect(() => {
-    if (mediaRef.current && mediaUrl) {
-      syncMediaElement(mediaRef.current, isPlaying);
-    }
-  }, [mediaKind, mediaUrl, isPlaying, syncMediaElement]);
+  const activeElement = useCallback((kind) => {
+    return kind === "video" ? videoElementRef.current : audioElementRef.current;
+  }, []);
 
   const play = useCallback((track) => {
-    const element = mediaRef.current;
+    const kind = mediaKindFor(track);
+    const element = activeElement(kind);
+    const otherElement = activeElement(kind === "video" ? "audio" : "video");
+    const nextUrl = fileUrl(`/api/tracks/${track.id}/stream`);
+
+    if (!element) return;
+
     if (current && current.id === track.id) {
-      if (element) {
-        element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      }
+      element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       return;
     }
 
-    if (element) {
-      element.pause();
+    otherElement?.pause();
+    otherElement?.removeAttribute("src");
+    otherElement?.load?.();
+
+    element.pause();
+    if (element.src !== nextUrl) {
+      element.src = nextUrl;
+      element.load();
     }
 
+    bindMediaEvents(element);
+
     setCurrent(track);
-    setMediaKind(mediaKindFor(track));
-    setMediaUrl(fileUrl(`/api/tracks/${track.id}/stream`));
+    setMediaKind(kind);
+    setMediaUrl(nextUrl);
     setProgress(0);
     setDuration(0);
-    setIsPlaying(true);
-  }, [current]);
+    element.currentTime = 0;
+    element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  }, [activeElement, bindMediaEvents, current]);
 
   const toggle = useCallback(() => {
-    const element = mediaRef.current;
+    const element = activeElement(mediaKind);
     if (!current) return;
     if (isPlaying) {
       element?.pause();
@@ -84,13 +82,14 @@ export function PlayerProvider({ children }) {
     } else {
       element?.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     }
-  }, [current, isPlaying]);
+  }, [activeElement, current, isPlaying, mediaKind]);
 
   const seek = useCallback((time) => {
-    if (!mediaRef.current) return;
-    mediaRef.current.currentTime = time;
+    const element = activeElement(mediaKind);
+    if (!element) return;
+    element.currentTime = time;
     setProgress(time);
-  }, []);
+  }, [activeElement, mediaKind]);
 
   return (
     <PlayerContext.Provider
@@ -101,7 +100,8 @@ export function PlayerProvider({ children }) {
         duration,
         mediaKind,
         mediaUrl,
-        attachMediaElement,
+        attachAudioElement,
+        attachVideoElement,
         play,
         toggle,
         seek,
