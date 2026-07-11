@@ -16,17 +16,32 @@ const adminRoutes = require("./routes/admin");
 
 const app = express();
 
+function normalizeOrigin(origin) {
+  return String(origin || "").trim().replace(/\/$/, "");
+}
+
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => normalizeOrigin(origin))
   .filter(Boolean);
+
+function isAllowedOrigin(origin) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return true;
+  if (allowedOrigins.includes(normalized)) return true;
+
+  // Keep Render deployments working when frontend URL changes (e.g., -1 suffix).
+  if (/^https:\/\/[a-z0-9-]+\.onrender\.com$/i.test(normalized)) return true;
+
+  return false;
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow non-browser clients and same-origin server calls.
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (isAllowedOrigin(origin)) return callback(null, true);
       return callback(new Error(`Unsupported CORS origin: ${origin}`));
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
