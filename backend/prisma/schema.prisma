@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ARTIST
+  LISTENER
+  ADMIN
+}
+
+enum OAuthProvider {
+  TWITTER
+  DISCORD
+  TWITCH
+}
+
+enum ReleaseType {
+  ALBUM
+  SINGLE
+  EP
+}
+
+enum LicenseType {
+  ALL_RIGHTS_RESERVED
+  CC_BY
+  CC_BY_SA
+  CC_BY_NC
+  CC_BY_NC_SA
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?
+  name         String
+  role         Role     @default(LISTENER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  artistProfile ArtistProfile?
+  albums        Album[]         @relation("ArtistAlbums")
+  tracks        Track[]         @relation("ArtistTracks")
+  following     Follow[]        @relation("FollowerUser")
+  followers     Follow[]        @relation("FollowedArtist")
+  oauthCredentials OAuthCredential[]
+  connectedAccounts ConnectedAccount[]
+  userLinks        UserLink[]
+  pressKits        PressKit[]
+  photos           Photo[]
+  releases         Release[]       @relation("ArtistReleases")
+  playlists        Playlist[]      @relation("OwnerPlaylists")
+  trackArtistCredits TrackArtist[]
+  likes            Like[]
+  comments         Comment[]
+  reposts          Repost[]
+  listeningEvents  ListeningEvent[]
+}
+
+model ArtistProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio             String?
+  profileImageUrl String?
+  coverImageUrl   String?
+  links           Json?    // { spotify, instagram, youtube, website, ... }
+  events          Json?
+  articles        Json?
+  merchandise     Json?
+  pressKitId      String?
+  pressKit        PressKit? @relation(fields: [pressKitId], references: [id], onDelete: SetNull)
+  updatedAt       DateTime @updatedAt
+}
+
+model OAuthCredential {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model ConnectedAccount {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    OAuthProvider
+  username    String?
+  profileUrl  String?
+  connectedAt DateTime      @default(now())
+
+  @@unique([userId, provider])
+}
+
+model UserLink {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model PressKit {
+  id           String   @id @default(uuid())
+  artistId     String   @unique
+  artist       User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  headline     String?
+  shortBio     String?
+  longBio      String?
+  bookingEmail String?
+  assets       Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profileOwners ArtistProfile[]
+}
+
+model Photo {
+  id        String   @id @default(uuid())
+  artistId  String
+  artist    User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model Album {
+  id          String   @id @default(uuid())
+  artistId    String
+  artist      User     @relation("ArtistAlbums", fields: [artistId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  coverArtUrl String?
+  releaseDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  tracks Track[]
+}
+
+model Track {
+  id         String   @id @default(uuid())
+  artistId   String
+  artist     User     @relation("ArtistTracks", fields: [artistId], references: [id], onDelete: Cascade)
+  albumId    String?
+  album      Album?   @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  releaseId  String?
+  release    Release? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  title      String
+  genre      String?
+  tags       String[] @default([])
+  fileUrl    String
+  durationMs Int?
+  playCount  Int      @default(0)
+  isDownloadable Boolean @default(false)
+  license      LicenseType @default(ALL_RIGHTS_RESERVED)
+  audioWaveform Json?
+  masterFileUrl String?
+  isPublic   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  trackPeaks      TrackPeak[]
+  trackMasters    TrackMaster[]
+  trackArtists    TrackArtist[]
+  listeningEvents ListeningEvent[]
+  playlistEntries TrackPlaylist[]
+  likes           Like[]
+  comments        Comment[]
+  reposts         Repost[]
+  releaseSections ReleaseSection[]
+}
+
+model TrackPeak {
+  id      String @id @default(uuid())
+  trackId String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  peaks   Json
+}
+
+model TrackMaster {
+  id         String   @id @default(uuid())
+  trackId    String
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  preset     String?
+  details    Json?
+  createdAt  DateTime @default(now())
+}
+
+model TrackArtist {
+  id           String   @id @default(uuid())
+  trackId      String
+  track        Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artistId     String
+  artist       User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  contribution String?
+
+  @@unique([trackId, artistId])
+}
+
+model Release {
+  id          String      @id @default(uuid())
+  artistId    String
+  artist      User        @relation("ArtistReleases", fields: [artistId], references: [id], onDelete: Cascade)
+  title       String
+  type        ReleaseType @default(ALBUM)
+  description String?
+  coverArtUrl String?
+  releaseDate DateTime    @default(now())
+  isPublic    Boolean     @default(true)
+  layout      Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tracks     Track[]
+  playlists  ReleasePlaylist[]
+  sections   ReleaseSection[]
+}
+
+model ReleasePlaylist {
+  id         String   @id @default(uuid())
+  releaseId  String
+  release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, playlistId])
+}
+
+model ReleaseSection {
+  id        String   @id @default(uuid())
+  releaseId String
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  title     String
+  kind      String?
+  layout    Json?
+  sortOrder Int      @default(0)
+
+  image     ReleaseSectionImage?
+  tracks    Track[]
+}
+
+model ReleaseSectionImage {
+  id        String         @id @default(uuid())
+  sectionId String         @unique
+  section   ReleaseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  altText   String?
+}
+
+model Playlist {
+  id          String   @id @default(uuid())
+  ownerId     String
+  owner       User     @relation("OwnerPlaylists", fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tracks      TrackPlaylist[]
+  releases    ReleasePlaylist[]
+}
+
+model TrackPlaylist {
+  id         String   @id @default(uuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  trackId    String
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  sortOrder  Int      @default(0)
+  addedAt    DateTime @default(now())
+
+  @@unique([playlistId, trackId])
+}
+
+model ListeningEvent {
+  id            String   @id @default(uuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  trackId       String
+  track         Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  progressSec   Int?
+  source        String?
+  createdAt     DateTime @default(now())
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, trackId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Repost {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, trackId])
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followerId String
+  follower   User     @relation("FollowerUser", fields: [followerId], references: [id], onDelete: Cascade)
+  artistId   String
+  artist     User     @relation("FollowedArtist", fields: [artistId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([followerId, artistId])
+}
