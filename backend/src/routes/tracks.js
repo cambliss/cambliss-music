@@ -13,7 +13,8 @@ function contentTypeFor(fileUrl) {
   if (ext === ".mp3") return "audio/mpeg";
   if (ext === ".wav") return "audio/wav";
   if (ext === ".flac") return "audio/flac";
-  if (ext === ".m4a" || ext === ".mp4") return "audio/mp4";
+  if (ext === ".m4a") return "audio/mp4";
+  if (ext === ".mp4") return "video/mp4";
   if (ext === ".ogg") return "audio/ogg";
   return "application/octet-stream";
 }

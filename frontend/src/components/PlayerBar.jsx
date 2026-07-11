@@ -9,12 +9,26 @@ function formatTime(sec) {
 }
 
 export default function PlayerBar() {
-  const { current, isPlaying, toggle, progress, duration, seek } = usePlayer();
+  const { current, isPlaying, toggle, progress, duration, seek, mediaKind, attachMediaElement } = usePlayer();
 
   if (!current) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-surface">
+      {mediaKind === "video" ? (
+        <div className="border-b border-hairline bg-ink/60 px-4 py-3">
+          <div className="mx-auto max-w-6xl">
+            <video
+              ref={attachMediaElement}
+              playsInline
+              preload="metadata"
+              className="h-40 w-full rounded-xl border border-hairline bg-black object-contain sm:h-56"
+            />
+          </div>
+        </div>
+      ) : (
+        <audio ref={attachMediaElement} preload="metadata" className="hidden" />
+      )}
       <input
         type="range"
         min={0}
@@ -40,7 +54,10 @@ export default function PlayerBar() {
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-paper">{current.title}</p>
-          <p className="truncate text-xs text-muted">{current.artist?.name}</p>
+          <p className="truncate text-xs text-muted">
+            {current.artist?.name}
+            {mediaKind === "video" ? " · MP4 video" : ""}
+          </p>
         </div>
 
         <span className="hidden font-mono text-xs text-muted sm:block">

@@ -1,52 +1,112 @@
-import { createContext, useContext, useRef, useState, useCallback } from "react";
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
 import { fileUrl } from "../api/client";
 
 const PlayerContext = createContext(null);
 
+function mediaKindFor(track) {
+  const source = String(track?.fileUrl || "").toLowerCase();
+  return source.endsWith(".mp4") ? "video" : "audio";
+}
+
 export function PlayerProvider({ children }) {
-  const audioRef = useRef(new Audio());
+  const mediaRef = useRef(null);
   const [current, setCurrent] = useState(null); // track object
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaKind, setMediaKind] = useState("audio");
+
+  const syncMediaElement = useCallback((element, autoplay) => {
+    if (!element || !mediaUrl) return;
+
+    if (element.src !== mediaUrl) {
+      element.src = mediaUrl;
+      element.load();
+    }
+
+    element.ontimeupdate = () => setProgress(element.currentTime);
+    element.onloadedmetadata = () => setDuration(element.duration);
+    element.onended = () => setIsPlaying(false);
+
+    if (autoplay) {
+      element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    }
+  }, [mediaUrl]);
+
+  const attachMediaElement = useCallback((element) => {
+    if (mediaRef.current === element) return;
+
+    if (mediaRef.current && mediaRef.current !== element) {
+      mediaRef.current.pause();
+    }
+
+    mediaRef.current = element;
+
+    if (element && mediaUrl) {
+      syncMediaElement(element, isPlaying);
+    }
+  }, [isPlaying, mediaUrl, syncMediaElement]);
+
+  useEffect(() => {
+    if (mediaRef.current && mediaUrl) {
+      syncMediaElement(mediaRef.current, isPlaying);
+    }
+  }, [mediaKind, mediaUrl, isPlaying, syncMediaElement]);
 
   const play = useCallback((track) => {
-    const audio = audioRef.current;
+    const element = mediaRef.current;
     if (current && current.id === track.id) {
-      audio.play();
-      setIsPlaying(true);
+      if (element) {
+        element.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      }
       return;
     }
-    audio.pause();
-    audio.src = fileUrl(`/api/tracks/${track.id}/stream`);
-    audio.play();
-    setCurrent(track);
-    setIsPlaying(true);
 
-    audio.ontimeupdate = () => setProgress(audio.currentTime);
-    audio.onloadedmetadata = () => setDuration(audio.duration);
-    audio.onended = () => setIsPlaying(false);
+    if (element) {
+      element.pause();
+    }
+
+    setCurrent(track);
+    setMediaKind(mediaKindFor(track));
+    setMediaUrl(fileUrl(`/api/tracks/${track.id}/stream`));
+    setProgress(0);
+    setDuration(0);
+    setIsPlaying(true);
   }, [current]);
 
   const toggle = useCallback(() => {
-    const audio = audioRef.current;
+    const element = mediaRef.current;
     if (!current) return;
     if (isPlaying) {
-      audio.pause();
+      element?.pause();
       setIsPlaying(false);
     } else {
-      audio.play();
-      setIsPlaying(true);
+      element?.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     }
   }, [current, isPlaying]);
 
   const seek = useCallback((time) => {
-    audioRef.current.currentTime = time;
+    if (!mediaRef.current) return;
+    mediaRef.current.currentTime = time;
     setProgress(time);
   }, []);
 
   return (
-    <PlayerContext.Provider value={{ current, isPlaying, progress, duration, play, toggle, seek }}>
+    <PlayerContext.Provider
+      value={{
+        current,
+        isPlaying,
+        progress,
+        duration,
+        mediaKind,
+        mediaUrl,
+        attachMediaElement,
+        play,
+        toggle,
+        seek,
+      }}
+    >
       {children}
     </PlayerContext.Provider>
   );
