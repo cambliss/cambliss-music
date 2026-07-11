@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, requireRole, optionalAuth } = require("../middleware/auth");
-const { imageUpload } = require("../utils/upload");
+const { imageUpload, saveImageUpload } = require("../utils/upload");
 const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
@@ -36,6 +36,7 @@ router.get("/", optionalAuth, async (req, res) => {
 router.post("/", requireAuth, requireRole("ARTIST"), imageUpload.single("cover"), async (req, res) => {
   const { title, description, type, isPublic, releaseDate, layout } = req.body;
   if (!title?.trim()) return res.status(400).json({ error: "title is required" });
+  const coverArtUrl = req.file ? await saveImageUpload(req.file) : null;
 
   const allowedTypes = ["ALBUM", "SINGLE", "EP"];
   const release = await prisma.release.create({
@@ -46,7 +47,7 @@ router.post("/", requireAuth, requireRole("ARTIST"), imageUpload.single("cover")
       type: allowedTypes.includes(type) ? type : "ALBUM",
       isPublic: isPublic === undefined ? true : isPublic === "true" || isPublic === true,
       releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
-      coverArtUrl: req.file ? `/uploads/images/${req.file.filename}` : null,
+      coverArtUrl,
       layout: layout || null,
     },
   });

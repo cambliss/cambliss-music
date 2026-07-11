@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { imageUpload } = require("../utils/upload");
+const { imageUpload, saveImageUpload } = require("../utils/upload");
 const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
@@ -39,6 +39,7 @@ router.get("/:id", async (req, res) => {
 router.post("/", requireAuth, requireRole("ARTIST"), imageUpload.single("cover"), async (req, res) => {
   const { title, description, releaseDate } = req.body;
   if (!title) return res.status(400).json({ error: "title is required" });
+  const coverArtUrl = req.file ? await saveImageUpload(req.file) : null;
 
   const album = await prisma.album.create({
     data: {
@@ -46,7 +47,7 @@ router.post("/", requireAuth, requireRole("ARTIST"), imageUpload.single("cover")
       description: description || null,
       artistId: req.user.id,
       releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
-      coverArtUrl: req.file ? `/uploads/images/${req.file.filename}` : null,
+      coverArtUrl,
     },
   });
 

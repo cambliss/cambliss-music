@@ -12,6 +12,7 @@ client.interceptors.request.use((config) => {
 
 export function fileUrl(path) {
   if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
   return `${API_BASE_URL}${path}`;
 }
 

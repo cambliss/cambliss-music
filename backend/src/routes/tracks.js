@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const prisma = require("../prisma");
 const { requireAuth, requireRole, optionalAuth } = require("../middleware/auth");
-const { audioUpload, UPLOAD_ROOT } = require("../utils/upload");
+const { audioUpload, saveTrackUpload, UPLOAD_ROOT } = require("../utils/upload");
 const { filterPlayableTracks, isTrackPlayable } = require("../utils/media");
 
 const router = express.Router();
@@ -16,6 +16,10 @@ function contentTypeFor(fileUrl) {
   if (ext === ".m4a" || ext === ".mp4") return "audio/mp4";
   if (ext === ".ogg") return "audio/ogg";
   return "application/octet-stream";
+}
+
+function isExternalMediaUrl(fileUrl) {
+  return /^https?:\/\//i.test(String(fileUrl || ""));
 }
 
 // List / browse tracks
@@ -88,6 +92,7 @@ router.post(
       "CC_BY_NC_SA",
     ];
     const normalizedLicense = allowedLicenses.includes(license) ? license : "ALL_RIGHTS_RESERVED";
+    const uploadedFileUrl = await saveTrackUpload(req.file);
 
     const track = await prisma.track.create({
       data: {
@@ -97,8 +102,8 @@ router.post(
         albumId: albumId || null,
         releaseId: releaseId || null,
         tags: parsedTags,
-        fileUrl: `/uploads/tracks/${req.file.filename}`,
-        masterFileUrl: `/uploads/tracks/${req.file.filename}`,
+        fileUrl: uploadedFileUrl,
+        masterFileUrl: uploadedFileUrl,
         isDownloadable: isDownloadable === "true" || isDownloadable === true,
         license: normalizedLicense,
         isPublic: isPublic === undefined ? true : isPublic === "true" || isPublic === true,
@@ -146,6 +151,10 @@ router.get("/:id/download", async (req, res) => {
     return res.status(403).json({ error: "Track is not downloadable" });
   }
 
+  if (isExternalMediaUrl(track.fileUrl)) {
+    return res.redirect(track.fileUrl);
+  }
+
   const filePath = path.join(UPLOAD_ROOT, "tracks", path.basename(track.fileUrl));
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: "Audio file missing on server" });
@@ -163,7 +172,9 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
   await prisma.track.delete({ where: { id: req.params.id } });
   const filePath = path.join(UPLOAD_ROOT, "tracks", path.basename(track.fileUrl));
-  fs.unlink(filePath, () => {});
+  if (!isExternalMediaUrl(track.fileUrl)) {
+    fs.unlink(filePath, () => {});
+  }
   res.status(204).end();
 });
 
@@ -171,6 +182,24 @@ router.delete("/:id", requireAuth, async (req, res) => {
 router.get("/:id/stream", optionalAuth, async (req, res) => {
   const track = await prisma.track.findUnique({ where: { id: req.params.id } });
   if (!track) return res.status(404).json({ error: "Track not found" });
+
+  if (isExternalMediaUrl(track.fileUrl)) {
+    prisma.track
+      .update({ where: { id: track.id }, data: { playCount: { increment: 1 } } })
+      .catch(() => {});
+
+    prisma.listeningEvent
+      .create({
+        data: {
+          trackId: track.id,
+          userId: req.user?.id || null,
+          source: req.query.source ? String(req.query.source) : null,
+        },
+      })
+      .catch(() => {});
+
+    return res.redirect(track.fileUrl);
+  }
 
   const filePath = path.join(UPLOAD_ROOT, "tracks", path.basename(track.fileUrl));
   if (!fs.existsSync(filePath)) {

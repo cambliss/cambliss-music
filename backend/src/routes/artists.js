@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../prisma");
 const { requireAuth, optionalAuth } = require("../middleware/auth");
-const { imageUpload } = require("../utils/upload");
+const { imageUpload, saveImageUpload } = require("../utils/upload");
 const { filterPlayableTracks } = require("../utils/media");
 
 const router = express.Router();
@@ -149,11 +149,12 @@ router.post(
       return res.status(403).json({ error: "Only artists can upload gallery photos" });
     }
     if (!req.file) return res.status(400).json({ error: "No image file provided" });
+    const imageUrl = await saveImageUpload(req.file);
 
     const photo = await prisma.photo.create({
       data: {
         artistId: req.user.id,
-        imageUrl: `/uploads/images/${req.file.filename}`,
+        imageUrl,
         caption: req.body.caption || null,
       },
     });
@@ -174,7 +175,7 @@ router.post(
     const { kind } = req.body; // "profile" | "cover"
     if (!req.file) return res.status(400).json({ error: "No image file provided" });
 
-    const url = `/uploads/images/${req.file.filename}`;
+    const url = await saveImageUpload(req.file);
     const field = kind === "cover" ? "coverImageUrl" : "profileImageUrl";
 
     const profile = await prisma.artistProfile.upsert({
