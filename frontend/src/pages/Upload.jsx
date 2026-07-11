@@ -194,7 +194,7 @@ export default function Upload() {
           </label>
           <input
             type="file"
-            accept="audio/*"
+            accept="audio/*,.m4a,.mp4"
             onChange={(e) => setTrackFile(e.target.files[0])}
             className="w-full text-xs text-muted"
           />

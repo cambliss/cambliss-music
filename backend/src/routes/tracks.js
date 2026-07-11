@@ -7,6 +7,16 @@ const { audioUpload, UPLOAD_ROOT } = require("../utils/upload");
 
 const router = express.Router();
 
+function contentTypeFor(fileUrl) {
+  const ext = path.extname(String(fileUrl || "")).toLowerCase();
+  if (ext === ".mp3") return "audio/mpeg";
+  if (ext === ".wav") return "audio/wav";
+  if (ext === ".flac") return "audio/flac";
+  if (ext === ".m4a" || ext === ".mp4") return "audio/mp4";
+  if (ext === ".ogg") return "audio/ogg";
+  return "application/octet-stream";
+}
+
 // List / browse tracks
 router.get("/", async (req, res) => {
   const { page = 1, pageSize = 20, genre, tag } = req.query;
@@ -138,7 +148,8 @@ router.get("/:id/download", async (req, res) => {
     return res.status(404).json({ error: "Audio file missing on server" });
   }
 
-  res.download(filePath, `${track.title}.mp3`);
+  const ext = path.extname(track.fileUrl || ".mp3") || ".mp3";
+  res.download(filePath, `${track.title}${ext}`);
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {
@@ -166,6 +177,7 @@ router.get("/:id/stream", optionalAuth, async (req, res) => {
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
   const range = req.headers.range;
+  const contentType = contentTypeFor(track.fileUrl);
 
   prisma.track
     .update({ where: { id: track.id }, data: { playCount: { increment: 1 } } })
@@ -191,13 +203,13 @@ router.get("/:id/stream", optionalAuth, async (req, res) => {
       "Content-Range": `bytes ${start}-${end}/${fileSize}`,
       "Accept-Ranges": "bytes",
       "Content-Length": chunkSize,
-      "Content-Type": "audio/mpeg",
+      "Content-Type": contentType,
     });
     fs.createReadStream(filePath, { start, end }).pipe(res);
   } else {
     res.writeHead(200, {
       "Content-Length": fileSize,
-      "Content-Type": "audio/mpeg",
+      "Content-Type": contentType,
       "Accept-Ranges": "bytes",
     });
     fs.createReadStream(filePath).pipe(res);
